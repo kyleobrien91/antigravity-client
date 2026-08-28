@@ -5,12 +5,11 @@ import * as jsonrpc from 'vscode-jsonrpc/node.js';
 
 test('ACP STDIO Server Initialization and Prompting', async () => {
     // Start the server process
-    const child = spawn('npx', ['tsx', 'src/cli/ag.ts', 'acp']);
+    const child = spawn('npx', ['tsx', 'src/cli/ag.ts', 'acp'], { shell: true });
 
     // Listen for stderr so we don't break stdout
-    child.stderr.on('data', (data) => {
-        // Just discard or log internally
-    });
+    child.stderr.on('data', () => {});
+    child.on('error', () => {});
 
     const connection = jsonrpc.createMessageConnection(
         new jsonrpc.StreamMessageReader(child.stdout),
@@ -33,14 +32,18 @@ test('ACP STDIO Server Initialization and Prompting', async () => {
 
         // Wait briefly just to ensure the auth is done and we can test we get errors properly without LS
         try {
-            const promptResult: any = await connection.sendRequest('session/prompt', { prompt: "test" });
+            await connection.sendRequest('session/prompt', { prompt: "test" });
             assert.fail("Should throw since no session started");
         } catch (e: any) {
             assert.strictEqual(e.code, jsonrpc.ErrorCodes.InvalidRequest);
         }
 
     } finally {
-        connection.end();
-        child.kill();
+        try {
+            connection.dispose();
+        } catch {}
+        try {
+            child.kill();
+        } catch {}
     }
 });
