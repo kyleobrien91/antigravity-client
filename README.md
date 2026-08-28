@@ -210,13 +210,103 @@ export ANTIGRAVITY_MODEL_ALIASES="my-custom-model:gemini-3.1-pro,gpt-4o-mini:gem
 
 ### Connecting with AI Coding Extensions & Tools
 
-| Tool | Configuration |
+| Tool | Configuration Summary |
 |---|---|
+| **OpenCode** | Provider: `@ai-sdk/openai-compatible`<br>Base URL: `http://localhost:8741/v1`<br>API Key: `dummy-key`<br>Config: `opencode.json` |
+| **Hermes Agent** | Provider: `custom`<br>Base URL: `http://localhost:8741/v1`<br>API Key: `dummy-key`<br>Command: `hermes model` or `~/.hermes/config.yaml` |
 | **Cline / Roo Code** | Provider: `OpenAI Compatible`<br>Base URL: `http://localhost:8741/v1`<br>API Key: `dummy-key`<br>Model ID: `gemini-3-flash` or `gemini-3.1-pro` |
 | **Cursor** | Custom OpenAI API Base URL: `http://localhost:8741/v1`<br>OpenAI API Key: `dummy-key` |
 | **Aider** | `aider --openai-api-base http://localhost:8741/v1 --openai-api-key dummy-key --model gemini-3.1-pro` |
 | **LibreChat** | Set `OPENAI_REVERSE_PROXY=http://localhost:8741/v1` in `.env` |
 | **Continue.dev** | Add provider `openai` with `"apiBase": "http://localhost:8741/v1"` in `config.json` |
+
+---
+
+#### 💻 Configuring OpenCode
+
+OpenCode uses the `@ai-sdk/openai-compatible` adapter. You can configure it either at project level (`opencode.json`) or globally (`~/.config/opencode/opencode.json` or `~/.opencode.json`):
+
+1. **Create or edit `opencode.json`**:
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "antigravity": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Antigravity Proxy",
+      "options": {
+        "baseURL": "http://localhost:8741/v1"
+      },
+      "models": {
+        "gemini-3-flash": {
+          "name": "Gemini 3 Flash"
+        },
+        "gemini-3.1-pro": {
+          "name": "Gemini 3.1 Pro"
+        },
+        "claude-3-5-sonnet": {
+          "name": "Claude 3.5 Sonnet (Antigravity)"
+        }
+      }
+    }
+  }
+}
+```
+
+2. **Authenticate with OpenCode**:
+Run the interactive auth command and enter the provider ID (`antigravity`) with any placeholder key:
+```bash
+opencode auth login
+# Select "Other" -> Enter Provider ID: "antigravity" -> API Key: "dummy-key"
+```
+*Or set the environment variable: `export ANTIGRAVITY_API_KEY=dummy-key`.*
+
+3. **Launch OpenCode**:
+```bash
+opencode
+# Use /models in the TUI to select gemini-3-flash or gemini-3.1-pro
+```
+
+---
+
+#### 🧠 Configuring Hermes (Nous Research)
+
+Hermes Agent connects to custom OpenAI-compatible endpoints via the interactive CLI wizard or `~/.hermes/config.yaml`.
+
+##### Option A: Interactive CLI Wizard (Recommended)
+```bash
+hermes model
+```
+1. Select **Custom endpoint** from the provider list.
+2. Enter **Base URL**: `http://localhost:8741/v1`
+3. Enter **API Key**: `dummy-key`
+4. Enter **Model**: `gemini-3-flash` (or `gemini-3.1-pro`)
+
+##### Option B: Direct CLI Commands
+```bash
+hermes config set model.provider custom
+hermes config set model.base_url http://localhost:8741/v1
+hermes config set model.default gemini-3-flash
+```
+
+##### Option C: Manual `~/.hermes/config.yaml`
+```yaml
+model:
+  provider: custom
+  default: gemini-3-flash
+  base_url: http://localhost:8741/v1
+```
+And add to `~/.hermes/.env`:
+```bash
+CUSTOM_API_KEY=dummy-key
+```
+
+Verify your setup with:
+```bash
+hermes doctor
+```
+
+---
 
 ---
 
