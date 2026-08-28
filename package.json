@@ -5,7 +5,8 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "bin": {
-    "antigravity-web": "dist/src/server/web-poc/server.js"
+    "antigravity-web": "dist/src/server/web-poc/server.js",
+    "ag": "dist/src/cli/ag.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

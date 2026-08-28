@@ -1,0 +1,23 @@
+services:
+  zerogravity-proxy:
+    container_name: zerogravity-proxy
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8741:8741"
+    volumes:
+      - ./accounts.json:/root/.config/antigravity-client/accounts.json
+      - ./aliases.json:/root/.config/antigravity-client/aliases.json
+    environment:
+      - ANTIGRAVITY_SYSTEM_MODE=native
+      - ANTIGRAVITY_DEVICE_FINGERPRINT=${ANTIGRAVITY_DEVICE_FINGERPRINT:-}
+      - ANTIGRAVITY_IDE_VERSION=1.107.0
+      - ANTIGRAVITY_QUOTA_CAP=0.2
+      - ANTIGRAVITY_SENSITIVE_WORDS=Claude Code,Cursor,OpenCode,aider,Cline
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8741/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
