@@ -25,6 +25,12 @@ export async function handleOpenAIRequest(
     }
 
     if (path === '/v1/chat/completions') {
+        if (!body || !body.messages || !Array.isArray(body.messages) || body.messages.length === 0 || !body.model) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: { message: "Invalid request body: 'messages' must be a non-empty array and 'model' is required." } }));
+            return;
+        }
+
         const model = resolveModel(body.model || 'gemini-3-flash');
         
         const userText = Array.isArray(body.messages) ? body.messages.filter((m: any) => m.role === 'user').map((m: any) => typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).join('\n') : '';
@@ -52,6 +58,15 @@ export async function handleOpenAIRequest(
         const cascade = await client.startCascade();
         trace.setCascadeId(cascade.cascadeId);
         
+        let isCompleted = false;
+        const cancelCascade = () => {
+            if (!isCompleted) {
+                cascade.cancel().catch(e => console.error("Failed to cancel cascade:", e));
+            }
+        };
+        req.on('close', cancelCascade);
+        req.on('aborted', cancelCascade);
+
         const lastMessage = messages[messages.length - 1]?.content || '';
         const reqPromise = cascade.sendMessage(lastMessage, { model });
 
@@ -69,6 +84,7 @@ export async function handleOpenAIRequest(
                 });
 
                 await reqPromise;
+                isCompleted = true;
                 trace.addTurn({ turn: 1, mitm_matched: true, response: { text_len: 0, thinking_len: 0, finish_reason: 'stop', grounding: false } });
                 await trace.finishAndWrite('success');
                 res.write(`data: [DONE]\n\n`);
@@ -77,6 +93,7 @@ export async function handleOpenAIRequest(
                 let fullText = '';
                 cascade.on('text', (ev: any) => { fullText += ev.delta; });
                 await reqPromise;
+                isCompleted = true;
 
                 trace.addTurn({ turn: 1, mitm_matched: true, response: { text_len: fullText ? fullText.length : 0, thinking_len: 0, text_preview: fullText ? fullText.substring(0, 50) : '', finish_reason: 'stop', grounding: false } });
                 trace.setUsage({ input_tokens: 0, output_tokens: fullText ? Math.ceil(fullText.length / 4) : 0, thinking_tokens: 0, cache_read: 0 });
@@ -101,6 +118,9 @@ export async function handleOpenAIRequest(
             if (!res.headersSent) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: { message: err?.message || 'Internal Server Error' } }));
+            } else if (body.stream) {
+                res.write(`data: ${JSON.stringify({ error: { message: err?.message || String(err) } })}\n\n`);
+                res.end();
             }
         }
         return;
