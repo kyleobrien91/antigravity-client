@@ -33,31 +33,37 @@ export class AccountsStore {
     }
 
     public load(): AccountsConfig {
-        if (!fs.existsSync(this.configPath)) {
-            return this.createDefaultConfig();
-        }
-
+        let raw: string;
         try {
-            const raw = fs.readFileSync(this.configPath, 'utf8');
-            const data = JSON.parse(raw) as Partial<AccountsConfig>;
-            
-            // Migrate / ensure defaults
-            const config: AccountsConfig = {
-                accounts: data.accounts || [],
-                active: data.active,
-                device_fingerprint: data.device_fingerprint || crypto.randomUUID(),
-            };
-
-            // If device fingerprint was missing, save the newly generated one
-            if (!data.device_fingerprint) {
-                this.save(config);
+            raw = fs.readFileSync(this.configPath, 'utf8');
+        } catch (err: any) {
+            if (err.code === 'ENOENT') {
+                return this.createDefaultConfig();
             }
-
-            return config;
-        } catch (err) {
-            console.error(`[AccountsStore] Failed to read accounts config: ${err}`);
-            return this.createDefaultConfig();
+            throw err;
         }
+
+        let data: Partial<AccountsConfig>;
+        try {
+            data = JSON.parse(raw) as Partial<AccountsConfig>;
+        } catch (err) {
+            console.warn(`[AccountsStore] Warning: Configuration file at ${this.configPath} is corrupted or invalid JSON.`);
+            throw err;
+        }
+            
+        // Migrate / ensure defaults
+        const config: AccountsConfig = {
+            accounts: data.accounts || [],
+            active: data.active,
+            device_fingerprint: data.device_fingerprint || crypto.randomUUID(),
+        };
+
+        // If device fingerprint was missing, save the newly generated one
+        if (!data.device_fingerprint) {
+            this.save(config);
+        }
+
+        return config;
     }
 
     public save(config: AccountsConfig): void {

@@ -11,11 +11,18 @@ async function main() {
         case 'extract':
             await runExtract();
             break;
-        case 'serve':
+        case 'serve': {
             const portIndex = process.argv.indexOf('--port');
-            const port = portIndex > -1 ? parseInt(process.argv[portIndex + 1], 10) : 8741;
+            let port = 8741;
+            if (portIndex > -1 && portIndex + 1 < process.argv.length) {
+                const parsed = parseInt(process.argv[portIndex + 1], 10);
+                if (!isNaN(parsed) && parsed > 0) {
+                    port = parsed;
+                }
+            }
             await runServe(port);
             break;
+        }
         case 'acp':
             await runAcp();
             break;
