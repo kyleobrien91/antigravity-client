@@ -1,47 +1,90 @@
-# Zero-Gravity (ZG) Roadmap
+# Zero-Gravity (ZG) Roadmap & Status Matrix
 
-This document outlines the high-level roadmap for integrating the stealth, Man-In-The-Middle (MITM), and OpenAI-compatible proxy features into the Antigravity Client, inspired by the architecture of the [zero-gravity](https://github.com/zhe-gu/zero-gravity) project.
+This document tracks the roadmap and implementation status for integrating stealth, webview lifecycle emulation, multi-protocol proxies, and native tool execution into **`antigravity-client`**, synthesizing the best architectural paradigms from [`zero-gravity`](https://github.com/zhe-gu/zero-gravity) and official Antigravity Language Server (`ls_core`) protocols.
 
-## Vision
+---
 
-To evolve the current direct-client architecture into a robust, stealthy proxy that MITM-intercepts a real Language Server (LS) binary. This allows for injecting custom tools, images, and prompts while streaming responses back through an OpenAI-compatible API, all while remaining completely indistinguishable from real Antigravity IDE traffic to Google's backend.
+## 1. Architectural Vision
 
-## Phase 1: Stealth Foundation & MITM Architecture
+To provide a production-grade, headless client, runtime environment, and protocol gateway that uses Google's authentic Language Server Go binary as its core engine. Outbound gRPC/TLS traffic to Google Cloud originates directly from Google's compiled binary (guaranteeing 100% authentic BoringSSL JA3/JA4 TLS fingerprints and HTTP/2 framing), while a faithful local Mock Extension Server and multi-protocol proxy interface external AI tools (**OpenCode**, **OpenClaw**, **Hermes Agent**, **Msty**, **Claude Code**, **Cursor**, **Aider**, **Cline**) seamlessly.
 
-The first phase focuses on establishing the intercept layer and ensuring all outbound traffic matches the exact cryptographic and timing fingerprints of a legitimate browser/Electron environment.
+```text
+Real Antigravity ls_core (Official Go binary)
+        ↓  [Connect-RPC / HTTP/2 TLS + Named Pipe Liveness]
+faithful local runtime substrate (antigravity-client)
+  ├── Mock Extension Server (USS state sync, ExecuteCommand, SaveDocument)
+  ├── Authentic Connect-RPC / Protobuf facade (@bufbuild/protobuf)
+  └── Stealth Subsystem (Outbound TLS shield, zero-width obfuscator, fingerprint & jitter)
+        ↓
+native Cascade (Authoritative Agent/Tool Loop)
+        ↓
+thin protocol gateway (Inside antigravity-client)
+        ↓
+Outward Projections:
+  ├── OpenAI Responses API (POST /v1/responses - Primary OpenCode Target)
+  ├── OpenAI Chat Completions (POST /v1/chat/completions)
+  ├── Agent Client Protocol (ACP v2 JSON-RPC over stdio)
+  ├── Anthropic Messages API (POST /v1/messages)
+  ├── Google Gemini API (POST /v1beta/models/*)
+  └── Interactive CLI & Diagnostics (ag extract / ag serve / ag fingerprint)
+```
 
-* **MITM Proxy Interception:**
-  * Implement an intercept layer to capture HTTPS traffic between the standalone Language Server and Google's backend APIs (`generativelanguage.googleapis.com`, etc.).
-  * Use UID-scoped routing (e.g., `iptables` redirect on Linux, or equivalent packet filtering on macOS/Windows) to ensure only the LS traffic is routed through the MITM proxy.
-* **TLS Fingerprinting (BoringSSL):**
-  * Replace standard TLS termination with a BoringSSL-backed implementation.
-  * Replicate exact Chrome JA3/JA4 TLS fingerprints and HTTP/2 (H2) connection signatures so the backend cannot distinguish the proxy from the real Electron webview.
-* **Network Jitter & Timing Obfuscation:**
-  * Introduce randomized jitter on all network intervals, request delays, and stream processing to prevent timing-based heuristic detection.
+---
 
-## Phase 2: Antigravity Protocol Emulation & Injection
+## 2. Implementation Status Matrix
 
-Once the stealth layer is in place, the next phase involves actively modifying the traffic on the fly and emulating IDE behavior.
+### Phase 1: Core Substrate & Headless LS Lifecycle
+| Capability | Status | Implementation Details |
+| :--- | :---: | :--- |
+| **Headless LS Process Launcher** | `COMPLETED` | `src/server/launcher.ts` — spawns binary with pipe liveness & CSRF tokens |
+| **Named Pipe Liveness Protocol** | `COMPLETED` | Cross-platform named pipe (`\\.\pipe\server_<hex>` / Unix sockets) |
+| **Typed Protobuf Message Classes** | `COMPLETED` | `src/gen/` — 25+ packages compiled via `@bufbuild/protobuf` & `@connectrpc` |
+| **Connect-RPC HTTP/2 TLS Client** | `COMPLETED` | `src/core/client.ts` — TLS handshake with bundled `cert.pem` & CSRF header |
+| **Multi-Platform SQLite Token Discovery**| `COMPLETED` | `src/server/auth-reader.ts` — read-only SQLite URI extraction from `state.vscdb` |
+| **Unified State Sync (USS) OAuth** | `COMPLETED` | `src/server/mock-extension-server.ts` — active `SubscribeToUnifiedStateSyncTopic` |
+| **Native Cascade Session Engine** | `COMPLETED` | `src/core/cascade/` — `CascadeStreamHandler` & `CascadeEventParser` |
 
-* **Protocol Emulation (Warmups & Heartbeats):**
-  * Automatically inject background warmup and heartbeat RPC calls to keep the session alive and mimic normal user interaction patterns within the IDE.
-* **Dynamic Payload Injection:**
-  * Intercept the "dummy prompt" sent by the local client to the LS.
-  * Swap the dummy prompt with the actual user request in the outbound encrypted payload.
-  * Inject tools, generation parameters, and image attachments directly into the outgoing request stream before it is re-encrypted with the Chrome TLS fingerprint.
-* **Stream Parsing & Translation:**
-  * Parse the incoming Server-Sent Events (SSE) from Google's backend on the fly.
-  * Extract text chunks, thinking tokens, tool calls, and usage metrics from the raw Antigravity response format.
+### Phase 2: Stealth Subsystem & Lifecycle Emulation
+| Capability | Status | Implementation Details |
+| :--- | :---: | :--- |
+| **Zero Outbound Node TLS (Binary Shield)**| `COMPLETED` | 100% of outbound Google Cloud traffic routed through LS Go binary |
+| **Zero-Width Space Sensitive Word Shield**| `COMPLETED` | `src/proxy/stealth/obfuscator.ts` — `\u200B` injection for client names |
+| **Device Fingerprint & Versioning** | `COMPLETED` | `src/proxy/stealth/fingerprint.ts` — IDE version & device ID synchronization |
+| **System Prompt Transformation Modes** | `COMPLETED` | `src/proxy/stealth/prompt-modes.ts` — `native`, `stealth`, and `minimal` modes |
+| **Multi-Account Storage & Rotation** | `COMPLETED` | `src/accounts/` — `oauth.ts`, `rotator.ts`, `store.ts` for automated rotation |
+| **Webview Startup Warmup Sequence** | `PENDING` | `src/proxy/stealth/warmup.ts` — 13-RPC initialization sequence (50-200ms jitter) |
+| **Background Heartbeat Loop with Jitter** | `PENDING` | `src/proxy/stealth/heartbeat.ts` — 30s $\pm 500\text{ms}$ periodic keep-alive |
+| **In-Memory Quota & Credit Monitor** | `PENDING` | `src/proxy/quota/monitor.ts` — 60s cache polling; expose `GET /v1/quota` |
+| **Structured JSON Call Tracing** | `PENDING` | `src/proxy/stealth/trace.ts` — file-based per-call traces in `~/.config/antigravity/` |
 
-## Phase 3: OpenAI-Compatible API Interface
+### Phase 3: Multi-Protocol Gateway & Tool Fidelity
+| Capability | Status | Implementation Details |
+| :--- | :---: | :--- |
+| **OpenAI Chat Completions (`/v1/chat/completions`)** | `COMPLETED` | `src/proxy/routes/openai-routes.ts` — streaming & non-streaming responses |
+| **Dynamic Models Catalog (`/v1/models`)** | `COMPLETED` | `src/proxy/routes/openai-routes.ts` & `src/proxy/aliases.ts` |
+| **Anthropic Messages API (`/v1/messages`)** | `COMPLETED` | `src/proxy/routes/anthropic-routes.ts` — Claude Code / Cursor compatibility |
+| **Google Gemini API (`/v1beta/models/*`)** | `COMPLETED` | `src/proxy/routes/gemini-routes.ts` — native Gemini payload mapping |
+| **CLI Suite (`ag extract`, `ag serve`, `ag fingerprint`)** | `COMPLETED` | `src/cli/ag.ts`, `src/cli/commands/` |
+| **Docker Standalone Runtime** | `COMPLETED` | `docker/Dockerfile`, `docker/docker-compose.template.yml` |
+| **Submodule Tracking** | `COMPLETED` | `zero-gravity` submodule linked under `./zero-gravity` |
+| **OpenAI Responses API (`POST /v1/responses`)** | `PENDING` | 6-stage SSE lifecycle for OpenCode compatibility |
+| **Real `SaveDocument` Disk Persistence** | `PENDING` | `src/server/mock-extension-server.ts` — decode request & persist to disk |
+| **Agent Client Protocol (ACP v2 Stdio Server)** | `PENDING` | `src/cli/commands/acp.ts` — JSON-RPC 2.0 stdio server |
+| **Comprehensive Master Test Suite** | `PENDING` | `test/test_cascade_golden_path.ts` & `test/run_all_tests.ts` |
 
-The final phase surfaces the power of the MITM proxy through standard, universally compatible interfaces, allowing drop-in replacement for existing AI tools.
+---
 
-* **OpenAI Proxy Endpoints:**
-  * Implement standard OpenAI REST API endpoints, primarily `/v1/chat/completions`.
-  * Support mapping of OpenAI's `messages` array, system prompts, and `tools` to Antigravity's internal state representations.
-* **Model Routing & Mapping:**
-  * Expose available Antigravity models (e.g., `gemini-3-pro`, `opus-4.6`) as OpenAI model strings.
-* **Headless Daemon & Session Management:**
-  * Build a background daemon (manager) to handle OAuth token refreshing, session tracking, and lifecycle management of the LS binary automatically.
-  * Expose configuration interfaces for easy setup across Linux, macOS, and Windows.
+## 3. Immediate Action Plan
+
+1. **Implement Webview Startup Warmup & Heartbeat Loop**:
+   - Add `src/proxy/stealth/warmup.ts` (13-RPC burst on boot) and `src/proxy/stealth/heartbeat.ts` (30s $\pm 500\text{ms}$ timer).
+2. **Implement Real `SaveDocument` Disk Handler**:
+   - Update `src/server/mock-extension-server.ts` to decode `SaveDocumentRequest` via `@bufbuild/protobuf` and write file modifications to disk.
+3. **Add First-Class OpenAI Responses API (`POST /v1/responses`)**:
+   - Update `src/proxy/routes/openai-routes.ts` to support the full 6-stage SSE lifecycle (`response.created` $\dots$ `response.completed`).
+4. **Add Quota & Credit Monitor**:
+   - Implement `src/proxy/quota/monitor.ts` and add `GET /v1/quota` & `GET /v1/credits` endpoints to `src/proxy/server.ts`.
+5. **Implement ACP v2 Stdio Server**:
+   - Build `src/cli/commands/acp.ts` and wire `ag acp` CLI command.
+6. **Master Automated Test Suite**:
+   - Build `test/test_cascade_golden_path.ts` and `test/run_all_tests.ts` to assert end-to-end multi-turn coding and tool execution.
