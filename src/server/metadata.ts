@@ -29,7 +29,7 @@ export function createMetadataBinary(options: MetadataOptions = {}): Uint8Array 
         apiKey: options.apiKey ?? "",
         locale: options.locale ?? "en",
         sessionId: options.sessionId ?? `session-${Date.now()}`,
-        // @ts-ignore - Ensure device fingerprint propagates if codeium_common_pb hasn't updated its types
+        //  - Ensure device fingerprint propagates if codeium_common_pb hasn't updated its types
         deviceFingerprint: options.deviceFingerprint ?? "",
     });
     return metadata.toBinary();

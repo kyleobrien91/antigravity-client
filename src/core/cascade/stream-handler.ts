@@ -23,7 +23,7 @@ export class CascadeStreamHandler {
         this.abortController = new AbortController();
 
         const retryDelay = 1000;
-        let currentState = new CascadeState();
+        const currentState = new CascadeState();
 
         while (this.isListening) {
             // Use StreamAgentStateUpdates (modern) for real-time synchronization
@@ -35,7 +35,7 @@ export class CascadeStreamHandler {
 
             try {
                 const signal = this.abortController.signal;
-                // @ts-ignore - The method name might vary across SDK generations
+                //  - The method name might vary across SDK generations
                 for await (const res of this.lsClient.streamAgentStateUpdates(req, { signal })) {
                     const update = res.update;
                     if (!update) continue;

@@ -132,7 +132,7 @@ function applyRepeatedDiff(target: any, localName: string, rd: RepeatedDiff, fie
 
             if (field.kind === "message") {
                 // Get existing item at index
-                let existingItem = arr[idx];
+                const existingItem = arr[idx];
 
                 // If it's a message update, we expect the value case to be messageValue
                 // (or strictly generic SingularValue that contains messageValue)

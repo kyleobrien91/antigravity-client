@@ -122,8 +122,8 @@ export class TraceCollector {
         // Redact any authorization tokens or PII that might have leaked into previews or summaries
         const redact = (str: string) => {
             if (!str) return str;
-            return str.replace(/Bearer\s+[A-Za-z0-9\-\._~+\/]+=*/gi, 'Bearer [REDACTED]')
-                      .replace(/ya29\.[A-Za-z0-9\-\._~+\/]+/gi, '[REDACTED_OAUTH_TOKEN]');
+            return str.replace(/Bearer\\s+[A-Za-z0-9\\-\\_~\\+/]+=*/gi, 'Bearer [REDACTED]')
+                      .replace(/ya29\\.[A-Za-z0-9\\-\\_~\\+/]+/gi, '[REDACTED_OAUTH_TOKEN]');
         };
 
         if (this.data.client_request?.user_text_preview) {

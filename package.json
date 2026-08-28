@@ -14,7 +14,9 @@
     "mcp": "tsx src/cli/mcp_server.ts",
     "web": "tsx src/server/web-poc/server.ts",
     "build": "tsc -p tsconfig.build.json && tsx scripts/copy-web-poc-assets.ts",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "lint": "eslint src/ --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
   },
   "files": [
     "dist",
@@ -30,23 +32,27 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "@bufbuild/buf": "^1.65.0",
-    "@bufbuild/protoc-gen-es": "^1.10.0",
-    "@connectrpc/protoc-gen-connect-es": "^1.6.0",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/fs-extra": "^11.0.4",
-    "@types/node": "^25.2.3",
-    "fs-extra": "^11.3.3",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "@bufbuild/buf": "1.65.0",
+    "@bufbuild/protoc-gen-es": "1.10.0",
+    "@connectrpc/protoc-gen-connect-es": "1.6.0",
+    "@types/better-sqlite3": "7.6.13",
+    "@types/fs-extra": "11.0.4",
+    "@types/node": "25.2.3",
+    "@typescript-eslint/eslint-plugin": "7.1.0",
+    "@typescript-eslint/parser": "7.1.0",
+    "eslint": "8.57.0",
+    "fs-extra": "11.3.3",
+    "prettier": "3.2.5",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^1.10.0",
-    "@connectrpc/connect": "^1.6.0",
-    "@connectrpc/connect-node": "^1.6.0",
-    "@modelcontextprotocol/sdk": "^1.27.1",
-    "better-sqlite3": "^12.11.1",
-    "node-pty": "^1.1.0",
-    "vscode-jsonrpc": "^8.2.0"
+    "@bufbuild/protobuf": "1.10.0",
+    "@connectrpc/connect": "1.6.0",
+    "@connectrpc/connect-node": "1.6.0",
+    "@modelcontextprotocol/sdk": "1.27.1",
+    "better-sqlite3": "12.11.1",
+    "node-pty": "1.1.0",
+    "vscode-jsonrpc": "8.2.0"
   }
 }
