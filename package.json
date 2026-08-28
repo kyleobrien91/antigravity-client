@@ -11,6 +11,8 @@
   "scripts": {
     "test": "tsx test/run_all_tests.ts",
     "cli": "tsx src/repl.ts",
+    "ag": "tsx src/cli/ag.ts",
+    "serve": "tsx src/cli/ag.ts serve",
     "mcp": "tsx src/cli/mcp_server.ts",
     "web": "tsx src/server/web-poc/server.ts",
     "build": "tsc -p tsconfig.build.json && tsx scripts/copy-web-poc-assets.ts",

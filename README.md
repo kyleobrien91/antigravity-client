@@ -54,6 +54,188 @@ console.log(`Connected as: ${status.userStatus?.name}`);
 
 ---
 
+## 🌐 OpenAI-Compatible API Proxy Server
+
+`antigravity-client` includes a high-performance, multi-protocol local proxy server that exposes Antigravity AI models through **standard OpenAI, Anthropic, and Gemini REST endpoints**.
+
+Use any OpenAI-compatible tool, library, IDE extension, or CLI (such as Cursor, Cline, Roo Code, Aider, OpenCode, LibreChat, or the official OpenAI Python/Node SDKs) by pointing `baseURL` to `http://localhost:8741/v1`.
+
+### 1. Extract Your Antigravity Token
+
+Log in to the official Antigravity IDE / Desktop app once, then extract your credentials:
+
+```bash
+# Using npx:
+npx ag extract
+
+# Or from local clone:
+npm run ag -- extract
+```
+*This extracts your OAuth refresh token and stores it safely in `~/.antigravity/accounts.json`.*
+
+### 2. Start the Proxy Server
+
+```bash
+# Start proxy on default port 8741:
+npx ag serve
+
+# Or specify a custom port:
+npx ag serve --port 9000
+
+# Or from local clone:
+npm run serve
+```
+
+When started, the proxy automatically:
+1. Performs an authentic webview startup warmup sequence.
+2. Initializes stealth device fingerprinting and anti-detection telemetry.
+3. Launches background quota monitors and heartbeat jitter loops.
+4. Serves OpenAI, Anthropic, and Gemini endpoints on `http://localhost:8741`.
+
+---
+
+### 3. Usage Examples
+
+#### cURL (OpenAI Chat Completions)
+
+```bash
+curl http://localhost:8741/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dummy-key" \
+  -d '{
+    "model": "gemini-3-flash",
+    "messages": [
+      {"role": "system", "content": "You are a helpful coding assistant."},
+      {"role": "user", "content": "Write a TypeScript function to reverse a string."}
+    ],
+    "stream": false
+  }'
+```
+
+#### Streaming SSE (Server-Sent Events)
+
+```bash
+curl -N http://localhost:8741/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer dummy-key" \
+  -d '{
+    "model": "gemini-3.1-pro",
+    "messages": [{"role": "user", "content": "Explain quantum computing in 3 sentences."}],
+    "stream": true
+  }'
+```
+
+#### Python (`openai` SDK)
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:8741/v1",
+    api_key="dummy-key"  # Any non-empty string
+)
+
+response = client.chat.completions.create(
+    model="gemini-3-flash",  # Or "gpt-4o", "claude-3-5-sonnet", "gemini-3.1-pro"
+    messages=[
+        {"role": "system", "content": "You are an expert Python engineer."},
+        {"role": "user", "content": "How do Python generators work under the hood?"}
+    ],
+    stream=True
+)
+
+for chunk in response:
+    content = chunk.choices[0].delta.content or ""
+    print(content, end="", flush=True)
+```
+
+#### TypeScript / Node.js (`openai` SDK)
+
+```typescript
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+    baseURL: "http://localhost:8741/v1",
+    apiKey: "dummy-key",
+});
+
+const completion = await openai.chat.completions.create({
+    model: "gpt-4o", // Automatically aliased to gemini-3-flash
+    messages: [{ role: "user", content: "Write a hello world in Rust" }],
+    stream: true,
+});
+
+for await (const chunk of completion) {
+    process.stdout.write(chunk.choices[0]?.delta?.content || "");
+}
+```
+
+---
+
+### Supported Endpoints
+
+| Protocol | Endpoint | Description |
+|---|---|---|
+| **OpenAI** | `GET /v1/models` | List all available models & aliases |
+| **OpenAI** | `POST /v1/chat/completions` | Chat completions (streaming & non-streaming) |
+| **OpenAI** | `POST /v1/responses` | OpenAI Responses API streaming SSE endpoint |
+| **Anthropic** | `POST /v1/messages` | Claude Messages API compatible format |
+| **Gemini** | `POST /v1beta/models/*` | Native Google AI Studio / Gemini REST API |
+| **Quota** | `GET /v1/quota`, `GET /v1/credits` | Current Antigravity quota and credit balances |
+| **Health** | `GET /health` | Healthcheck endpoint (`{"status": "ok"}`) |
+
+---
+
+### Model Aliases & Compatibility
+
+The proxy provides built-in model aliases so existing client tools work seamlessly without changing configurations:
+
+| Client Model Name | Mapped Target Model |
+|---|---|
+| `gpt-4o` | `gemini-3-flash` |
+| `gpt-4` | `gemini-3.1-pro` |
+| `claude-3-5-sonnet` | `gemini-3-flash` |
+| `sonnet-4.6` | `gemini-3-flash` |
+| `opus-4.6` | `gemini-3.1-pro` |
+| Native Antigravity Models | `gemini-3-flash`, `gemini-3.1-pro`, etc. |
+
+#### Custom Model Aliases
+You can define custom model aliases via environment variable or in `~/.antigravity/aliases.json`:
+
+```bash
+export ANTIGRAVITY_MODEL_ALIASES="my-custom-model:gemini-3.1-pro,gpt-4o-mini:gemini-3-flash"
+```
+
+---
+
+### Connecting with AI Coding Extensions & Tools
+
+| Tool | Configuration |
+|---|---|
+| **Cline / Roo Code** | Provider: `OpenAI Compatible`<br>Base URL: `http://localhost:8741/v1`<br>API Key: `dummy-key`<br>Model ID: `gemini-3-flash` or `gemini-3.1-pro` |
+| **Cursor** | Custom OpenAI API Base URL: `http://localhost:8741/v1`<br>OpenAI API Key: `dummy-key` |
+| **Aider** | `aider --openai-api-base http://localhost:8741/v1 --openai-api-key dummy-key --model gemini-3.1-pro` |
+| **LibreChat** | Set `OPENAI_REVERSE_PROXY=http://localhost:8741/v1` in `.env` |
+| **Continue.dev** | Add provider `openai` with `"apiBase": "http://localhost:8741/v1"` in `config.json` |
+
+---
+
+### ⚡ CLI Reference (`ag`)
+
+```bash
+ag <command> [options]
+```
+
+| Command | Description |
+|---|---|
+| `ag extract` | Extract OAuth credentials from local Antigravity IDE into `~/.antigravity/accounts.json` |
+| `ag serve [--port 8741]` | Start the multi-protocol OpenAI / Anthropic / Gemini proxy server |
+| `ag acp` | Run the Agent Client Protocol (ACP) JSON-RPC STDIO server (for Zed, Neovim, etc.) |
+| `ag quota` | Query live quota tiers, model rate limits, and remaining credits |
+| `ag fingerprint` | Display current stealth device fingerprint and IDE telemetry headers |
+
+---
+
 ## Features
 
 ### Direct Language Server Communication
