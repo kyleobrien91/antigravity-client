@@ -95,8 +95,8 @@ async function main() {
 
     // ── Send a simple message ──
 
-    console.log("📨 Sending message: 'Say hello in Japanese'...\n");
-    await cascade.sendMessage("日本語で「こんにちは」とだけ返答してください。それ以外は何も言わないで。");
+    console.log("📨 Sending message: 'Say hello'...\n");
+    await cascade.sendMessage("Please just reply 'hello' and say nothing else.");
 
     // Wait for response
     await new Promise<void>((resolve) => {

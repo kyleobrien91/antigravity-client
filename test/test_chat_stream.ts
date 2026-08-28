@@ -23,7 +23,7 @@ async function main() {
             process.stdout.write(`\x1b[90m${ev.delta}\x1b[0m`);
         });
 
-        const msg = "自己紹介をしてください。あなたのモデル名も含めて、3行程度でお願いします。<Thinking>...</Thinking>を使って考えてから答えてね。";
+        const msg = "Please introduce yourself. Please include your model name and keep it around 3 lines. Please use <Thinking>...</Thinking> before answering.";
         console.log(`📨 Sending message: "${msg}"`);
         console.log("--------------------------------------------------");
         

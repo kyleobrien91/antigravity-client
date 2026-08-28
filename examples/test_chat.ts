@@ -25,7 +25,7 @@ async function main() {
     });
 
     console.log("📨 Sending message...");
-    const msg = "Hello!なんか面白い創作の作品を考えて！<Thinking>...</Thinking>で徹底的に考えて！";
+    const msg = "Hello! Please think of an interesting creative work! Think deeply using <Thinking>...</Thinking>!";
     await cascade.run(msg, { timeoutMs: 60000 });
     console.log("\n✅ Message sent and processed.");
 

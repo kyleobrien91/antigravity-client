@@ -13,7 +13,7 @@ async function main() {
         const cascade = await client.startCascade();
         console.log(`✨ Cascade ID: ${cascade.cascadeId}`);
 
-        const msg = "このメッセージは低レイヤの sendMessage() から送信されています。";
+        const msg = "This message is sent using the low-level sendMessage() method.";
         console.log(`📨 Invoking sendMessage(): "${msg}"`);
         
         // Call sendMessage() directly instead of cascade.run()

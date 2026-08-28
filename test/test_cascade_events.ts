@@ -35,7 +35,7 @@ async function main() {
             console.log("\n✅ [Event: Done] Cascade stream has naturally ended.");
         });
 
-        const msg = "自己紹介をしてください。思考プロセス（Thinking）を含めて短めにお願いします。";
+        const msg = "Please introduce yourself. Keep it short and include your thinking process.";
         console.log(`\n📨 Sending message: "${msg}"`);
         console.log("--------------------------------------------------");
         
