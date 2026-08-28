@@ -1,5 +1,4 @@
 export const GOOGLE_OAUTH_CLIENT_ID = '45471411055-orntvc23415c4l2d338n5k2t69h4p5a7.apps.googleusercontent.com'; // Antigravity (or similar known client ID)
-export const GOOGLE_OAUTH_CLIENT_SECRET = 'GOCSPX-...'; // often Native Apps have no secret, or a known secret
 
 import type { Account } from './types.js';
 
@@ -9,7 +8,7 @@ export async function refreshAccessToken(account: Account): Promise<Account> {
     
     // We try generic native app client id, some don't require secret for PKCE/native
     // Or we use the exact ones from Antigravity open source clones
-    params.append('client_id', process.env.ANTIGRAVITY_CLIENT_ID || '45471411055-orntvc23415c4l2d338n5k2t69h4p5a7.apps.googleusercontent.com');
+    params.append('client_id', process.env.ANTIGRAVITY_CLIENT_ID || GOOGLE_OAUTH_CLIENT_ID);
     if (process.env.ANTIGRAVITY_CLIENT_SECRET) {
         params.append('client_secret', process.env.ANTIGRAVITY_CLIENT_SECRET);
     }

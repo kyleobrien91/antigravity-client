@@ -227,6 +227,9 @@ export class MockExtensionServer extends EventEmitter {
                         if (targetPath.startsWith("file://")) {
                             targetPath = fileURLToPath(targetPath);
                         }
+                        targetPath = decodeURIComponent(targetPath).replace(/\0/g, '');
+                        targetPath = path.normalize(targetPath);
+
                         const targetDir = path.dirname(targetPath);
                         fs.mkdirSync(targetDir, { recursive: true });
                         fs.writeFileSync(targetPath, req.targetContent);
@@ -259,10 +262,15 @@ export class MockExtensionServer extends EventEmitter {
                         }
                     });
 
+                    let cwd = process.cwd();
+                    if (req.cwd && fs.existsSync(req.cwd)) {
+                        cwd = req.cwd;
+                    }
+
                     let proc;
                     try {
                         proc = spawn(req.commandLine, [], {
-                            cwd: req.cwd || process.cwd(),
+                            cwd: cwd,
                             shell: true,
                         });
                     } catch (e: any) {
