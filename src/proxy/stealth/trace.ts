@@ -68,6 +68,8 @@ export interface TraceData {
 }
 
 export class TraceCollector {
+    public startTrace() {}
+    public writeTrace() {}
     private data: TraceData;
     private startTime: number;
     private enabled: boolean;
