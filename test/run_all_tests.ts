@@ -4,6 +4,8 @@ import * as path from 'path';
 
 async function main() {
     const testFiles = [
+        'unit/test_accounts_store.ts',
+        'unit/test_route_translation.ts',
         'test_cascade_golden_path.ts',
         'test_openai_responses.ts',
         'test_acp_stdio.ts',

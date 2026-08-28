@@ -140,7 +140,7 @@ export class AntigravityClient {
   static async connect(options: ClientOptions = {}): Promise<AntigravityClient> {
     let port = options.port;
     let csrfToken = options.csrfToken;
-    let apiKey = resolveApiKey(options.apiKey);
+    const apiKey = resolveApiKey(options.apiKey);
 
     if (!port || !csrfToken) {
         const detector = new AutoDetector();

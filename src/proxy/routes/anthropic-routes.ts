@@ -33,7 +33,7 @@ export async function handleAnthropicRequest(
         });
 
         // Anthropic system prompt can be top-level `system` property
-        let systemPrompt = typeof body.system === 'string' ? body.system : '';
+        const systemPrompt = typeof body.system === 'string' ? body.system : '';
         const messages = [...(body.messages || [])];
         if (systemPrompt) {
             messages.unshift({ role: 'system', content: systemPrompt });
