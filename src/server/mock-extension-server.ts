@@ -24,6 +24,8 @@ import {
     LaunchBrowserResponse,
     CheckTerminalShellSupportResponse,
     PushUnifiedStateSyncUpdateResponse,
+    WriteCascadeEditResponse,
+    SaveDocumentResponse,
 } from "../gen/exa/extension_server_pb/extension_server_pb.js";
 import { SmartFocusConversationResponse } from "../gen/exa/language_server_pb/language_server_pb.js";
 import { Topic, Topic_DataEntry, Row } from "../gen/exa/unified_state_sync_pb/unified_state_sync_pb.js";
@@ -35,6 +37,8 @@ import {
     TerminalShellCommandSource
 } from "../gen/exa/codeium_common_pb/codeium_common_pb.js";
 import { Timestamp } from "@bufbuild/protobuf";
+import { Code, ConnectError } from "@connectrpc/connect";
+import { fileURLToPath } from "url";
 
 /** Generate a Timestamp object for the current time */
 function currentTimestamp(): Timestamp {
@@ -215,6 +219,28 @@ export class MockExtensionServer extends EventEmitter {
 
                 pushUnifiedStateSyncUpdate() {
                     return new PushUnifiedStateSyncUpdateResponse();
+                },
+
+                writeCascadeEdit(req) {
+                    try {
+                        let targetPath = req.uri;
+                        if (targetPath.startsWith("file://")) {
+                            targetPath = fileURLToPath(targetPath);
+                        }
+                        const targetDir = path.dirname(targetPath);
+                        fs.mkdirSync(targetDir, { recursive: true });
+                        fs.writeFileSync(targetPath, req.targetContent);
+                        if (self.verbose) console.log(`[MockExtSrv] writeCascadeEdit saved to ${targetPath}`);
+                        return new WriteCascadeEditResponse();
+                    } catch (e: any) {
+                        console.error(`[MockExtSrv] Error writing cascade edit to ${req.uri}:`, e);
+                        throw new ConnectError(`Failed to write file: ${e.message}`, Code.Internal);
+                    }
+                },
+
+                saveDocument(req) {
+                    if (self.verbose) console.log(`[MockExtSrv] saveDocument requested for ${req.uri}`);
+                    return new SaveDocumentResponse();
                 },
 
                 async *executeCommand(req) {
