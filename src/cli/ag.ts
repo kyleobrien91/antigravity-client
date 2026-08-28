@@ -2,6 +2,7 @@
 import { runExtract } from './commands/extract.js';
 import { runServe } from './commands/serve.js';
 import { runQuota } from './commands/quota.js';
+import { runAcp } from './commands/acp.js';
 
 const command = process.argv[2];
 
@@ -14,6 +15,9 @@ async function main() {
             const portIndex = process.argv.indexOf('--port');
             const port = portIndex > -1 ? parseInt(process.argv[portIndex + 1], 10) : 8741;
             await runServe(port);
+            break;
+        case 'acp':
+            await runAcp();
             break;
         case 'quota':
             await runQuota();
