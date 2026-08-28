@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'http';
 import type { AntigravityClient } from '../../core/client.js';
 import { resolveModel } from '../aliases.js';
 import { obfuscatePayload } from '../stealth/obfuscator.js';
+import { TraceCollector } from '../stealth/trace.js';
 
 export async function handleGeminiRequest(
     req: IncomingMessage, 
@@ -18,6 +19,17 @@ export async function handleGeminiRequest(
     
     const resolvedModel = resolveModel(modelId);
 
+    const userText = Array.isArray(body.contents) ? body.contents.map((c: any) => c.parts?.map((p: any) => p.text || '').join('') || '').join('\n') : '';
+    const trace = new TraceCollector(path, '', modelId, isStream, {
+        message_count: Array.isArray(body.contents) ? body.contents.length : 0,
+        tool_count: Array.isArray(body.tools) ? body.tools.length : 0,
+        tool_round_count: 0,
+        user_text_len: userText.length,
+        user_text_preview: userText.substring(0, 50),
+        system_prompt: !!body.systemInstruction,
+        has_image: userText.includes('inlineData')
+    });
+
     // Obfuscate the contents
     const contents = obfuscatePayload(body.contents || []);
     
@@ -32,28 +44,44 @@ export async function handleGeminiRequest(
     });
 
     const cascade = await client.startCascade();
+    trace.setCascadeId(cascade.cascadeId);
     const reqPromise = cascade.sendMessage(promptText, { model: resolvedModel });
 
-    if (isStream) {
-        cascade.on('text', (ev: any) => {
-            const chunk = {
-                candidates: [{ content: { parts: [{ text: ev.delta }] } }]
+    try {
+        if (isStream) {
+            cascade.on('text', (ev: any) => {
+                const chunk = {
+                    candidates: [{ content: { parts: [{ text: ev.delta }] } }]
+                };
+                res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+            });
+
+            await reqPromise;
+            trace.addTurn({ turn: 1, mitm_matched: true, response: { text_len: 0, thinking_len: 0, finish_reason: 'STOP', grounding: false } });
+            await trace.finishAndWrite('success');
+            res.end();
+        } else {
+            let fullText = '';
+            cascade.on('text', (ev: any) => { fullText += ev.delta; });
+            await reqPromise;
+
+            trace.addTurn({ turn: 1, mitm_matched: true, response: { text_len: fullText ? fullText.length : 0, thinking_len: 0, text_preview: fullText ? fullText.substring(0, 50) : '', finish_reason: 'STOP', grounding: false } });
+            trace.setUsage({ input_tokens: 0, output_tokens: fullText ? Math.ceil(fullText.length / 4) : 0, thinking_tokens: 0, cache_read: 0 });
+            await trace.finishAndWrite('success');
+
+            const response = {
+                candidates: [
+                    { content: { parts: [{ text: fullText }], role: 'model' } }
+                ]
             };
-            res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-        });
-
-        await reqPromise;
-        res.end();
-    } else {
-        let fullText = '';
-        cascade.on('text', (ev: any) => { fullText += ev.delta; });
-        await reqPromise;
-
-        const response = {
-            candidates: [
-                { content: { parts: [{ text: fullText }], role: 'model' } }
-            ]
-        };
-        res.end(JSON.stringify(response));
+            res.end(JSON.stringify(response));
+        }
+    } catch (err: any) {
+        trace.addError(err?.message || String(err));
+        await trace.finishAndWrite('error');
+        if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: { message: err?.message || 'Internal Server Error' } }));
+        }
     }
 }
