@@ -3,13 +3,21 @@ import { AntigravityClient } from '../core/client.js';
 import { handleOpenAIRequest } from './routes/openai-routes.js';
 import { handleAnthropicRequest } from './routes/anthropic-routes.js';
 import { handleGeminiRequest } from './routes/gemini-routes.js';
+import { QuotaMonitor } from './quota/monitor.js';
 
 export interface ProxyServerOptions {
     port: number;
     client: AntigravityClient;
+    quotaMonitor?: QuotaMonitor;
 }
 
 export function startProxyServer(options: ProxyServerOptions) {
+    let quotaMonitor = options.quotaMonitor;
+    if (!quotaMonitor) {
+        quotaMonitor = new QuotaMonitor(options.client);
+        quotaMonitor.start();
+    }
+
     const server = http.createServer(async (req, res) => {
         const url = new URL(req.url || '/', `http://${req.headers.host}`);
         const path = url.pathname;
@@ -36,6 +44,10 @@ export function startProxyServer(options: ProxyServerOptions) {
             if (path === '/health') {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ status: 'ok' }));
+            } else if (path === '/v1/quota' || path === '/v1/credits') {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                const snapshot = quotaMonitor?.getSnapshot() || {};
+                res.end(JSON.stringify(snapshot));
             } else if (path.startsWith('/v1/chat/completions') || path.startsWith('/v1/models')) {
                 await handleOpenAIRequest(req, res, parsedBody, options.client, path);
             } else if (path.startsWith('/v1/messages')) {

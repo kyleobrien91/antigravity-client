@@ -194,6 +194,11 @@ export class AntigravityClient {
       return response;
   }
 
+  async getCascadeModelConfigData(): Promise<import("../gen/exa/codeium_common_pb/codeium_common_pb.js").CascadeModelConfigData> {
+      const response = await this.lsClient.getCascadeModelConfigData({});
+      return response;
+  }
+
   async getModelStatuses(): Promise<GetModelStatusesResponse> {
       const response = await this.lsClient.getModelStatuses({});
       return response;
