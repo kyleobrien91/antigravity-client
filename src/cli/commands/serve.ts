@@ -4,6 +4,7 @@ import { AccountRotator } from '../../accounts/rotator.js';
 import { AccountsStore } from '../../accounts/store.js';
 import { getDeviceFingerprint, getIdeVersion, getExtensionVersion } from '../../proxy/stealth/fingerprint.js';
 import { runWebviewWarmup } from '../../proxy/stealth/warmup.js';
+import { startHeartbeatLoop } from '../../proxy/stealth/heartbeat.js';
 
 export async function runServe(port: number) {
     console.log(`[Serve] Initializing ZeroGravity-style Proxy...`);
@@ -55,6 +56,19 @@ export async function runServe(port: number) {
 
     // Run the required startup warmup sequence before exposing the proxy
     await runWebviewWarmup(client);
+
+    // Start background heartbeat loop
+    const heartbeat = startHeartbeatLoop(client);
+
+    // Register stop callbacks on process termination
+    process.on('SIGINT', () => {
+        heartbeat.stop();
+        process.exit(0);
+    });
+    process.on('SIGTERM', () => {
+        heartbeat.stop();
+        process.exit(0);
+    });
 
     startProxyServer({ port, client });
 }
