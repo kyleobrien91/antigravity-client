@@ -1,6 +1,7 @@
 #!/usr/env/bin node
 import { runExtract } from './commands/extract.js';
 import { runServe } from './commands/serve.js';
+import { runQuota } from './commands/quota.js';
 
 const command = process.argv[2];
 
@@ -14,6 +15,9 @@ async function main() {
             const port = portIndex > -1 ? parseInt(process.argv[portIndex + 1], 10) : 8741;
             await runServe(port);
             break;
+        case 'quota':
+            await runQuota();
+            break;
         case 'fingerprint':
             const { getDeviceFingerprint, getIdeVersion } = await import('../proxy/stealth/fingerprint.js');
             console.log(`Device Fingerprint: ${getDeviceFingerprint()}`);
@@ -26,6 +30,7 @@ ZeroGravity-style Proxy CLI for Antigravity
 Usage:
   ag extract                Extract OAuth token from Antigravity IDE
   ag serve [--port 8741]    Start the multi-protocol proxy server
+  ag quota                  Show current quota and credit balances
   ag fingerprint            Show stealth device fingerprint and IDE info
             `);
             break;
