@@ -41,7 +41,6 @@ export async function handleOpenAIRequest(
 
         // Apply stealth/obfuscation pipeline
         const messages = obfuscatePayload(transformPrompt(body.messages || []));
-        trace.startTrace();
         
         res.writeHead(200, {
             'Content-Type': body.stream ? 'text/event-stream' : 'application/json',
@@ -72,8 +71,6 @@ export async function handleOpenAIRequest(
                 await reqPromise;
                 trace.addTurn({ turn: 1, mitm_matched: true, response: { text_len: 0, thinking_len: 0, finish_reason: 'stop', grounding: false } });
                 await trace.finishAndWrite('success');
-                trace.writeTrace();
-                trace.writeTrace();
                 res.write(`data: [DONE]\n\n`);
                 res.end();
             } else {
