@@ -92,6 +92,7 @@ describe("Cascade Golden Path End-to-End Test", () => {
 
         if (client) {
             try {
+                client.dispose();
                 await client.launcher.stop();
             } catch {}
         }

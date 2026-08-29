@@ -4,10 +4,10 @@
  * Provides OAuth tokens and USS data needed by the Mock Extension Server
  * and the Launcher to authenticate independent LS instances.
  */
-import Database from "better-sqlite3";
 import { homedir } from "os";
 import * as path from "path";
 import * as fs from "fs";
+import { execFileSync } from "child_process";
 import { Topic } from "../gen/exa/unified_state_sync_pb/unified_state_sync_pb.js";
 import { OAuthTokenInfo } from "../gen/exa/language_server_pb/language_server_pb.js";
 
@@ -31,25 +31,96 @@ function profileBaseDir(): string {
  * A user may be logged into either, so we probe both on every platform.
  */
 function stateDbCandidates(): string[] {
+    const candidates: string[] = [];
     const base = profileBaseDir();
-    return ["Antigravity", "Antigravity IDE"].map(
-        name => path.join(base, name, "User", "globalStorage", "state.vscdb"),
+    candidates.push(
+        path.join(base, "Antigravity", "User", "globalStorage", "state.vscdb"),
+        path.join(base, "Antigravity IDE", "User", "globalStorage", "state.vscdb"),
     );
+
+    // If running in WSL (or Linux with /mnt/c available), also check Windows host AppData
+    if (process.platform === "linux") {
+        const mntBase = "/mnt/c/Users";
+        if (fs.existsSync(mntBase)) {
+            try {
+                const users = fs.readdirSync(mntBase);
+                for (const u of users) {
+                    candidates.push(
+                        path.join(mntBase, u, "AppData", "Roaming", "Antigravity", "User", "globalStorage", "state.vscdb"),
+                        path.join(mntBase, u, "AppData", "Roaming", "Antigravity IDE", "User", "globalStorage", "state.vscdb"),
+                    );
+                }
+            } catch {
+                // Ignore permission or readdir errors
+            }
+        }
+    }
+
+    // If running on Windows (or Windows Node invoked from WSL where APPDATA may differ)
+    if (process.platform === "win32") {
+        if (process.env.USERPROFILE) {
+            candidates.push(
+                path.join(process.env.USERPROFILE, "AppData", "Roaming", "Antigravity", "User", "globalStorage", "state.vscdb"),
+                path.join(process.env.USERPROFILE, "AppData", "Roaming", "Antigravity IDE", "User", "globalStorage", "state.vscdb"),
+            );
+        }
+    }
+
+    return Array.from(new Set(candidates));
+}
+
+/**
+ * Query a key from state.vscdb using better-sqlite3 with python3/sqlite3 fallbacks.
+ */
+function queryStateDb(dbPath: string, key: string): string | null {
+    if (!fs.existsSync(dbPath)) return null;
+
+    // 1. Try better-sqlite3
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const Database = require("better-sqlite3");
+        const db = new Database(dbPath, { readonly: true });
+        try {
+            const row = db.prepare("SELECT value FROM ItemTable WHERE key=?").get(key) as { value: string } | undefined;
+            if (row && typeof row.value === "string") return row.value;
+        } finally {
+            db.close();
+        }
+    } catch {
+        // better-sqlite3 native bindings missing or failed, fall back
+    }
+
+    // 2. Fallback: query via python3/python
+    const pyCommands = process.platform === "win32" ? ["python", "python3"] : ["python3", "python"];
+    for (const cmd of pyCommands) {
+        try {
+            const script = `import sqlite3, sys; con = sqlite3.connect(sys.argv[1]); cur = con.cursor(); cur.execute("SELECT value FROM ItemTable WHERE key=?", (sys.argv[2],)); r = cur.fetchone(); print(r[0] if r else "", end="")`;
+            const res = execFileSync(cmd, ["-c", script, dbPath, key], { encoding: "utf8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"] });
+            if (res && res.length > 0) return res;
+        } catch {
+            // Next python command
+        }
+    }
+
+    // 3. Fallback: query via sqlite3 CLI
+    try {
+        const res = execFileSync("sqlite3", [dbPath, `SELECT value FROM ItemTable WHERE key='${key}';`], { encoding: "utf8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"] });
+        if (res && res.trim().length > 0) return res.trim();
+    } catch {
+        // sqlite3 CLI not found
+    }
+
+    return null;
 }
 
 /** True if this DB holds a non-empty OAuth token (the real, durable credential). */
 function dbHasOAuthToken(dbPath: string): boolean {
     try {
-        const db = new Database(dbPath, { readonly: true });
-        try {
-            const row = db.prepare("SELECT value FROM ItemTable WHERE key='antigravityUnifiedStateSync.oauthToken'").get() as { value: string } | undefined;
-            if (!row) return false;
-            const topic = Topic.fromBinary(Buffer.from(row.value, "base64"));
-            const entry = topic.data.find(e => e.key === "oauthTokenInfoSentinelKey");
-            return !!entry?.value?.value;
-        } finally {
-            db.close();
-        }
+        const raw = queryStateDb(dbPath, "antigravityUnifiedStateSync.oauthToken");
+        if (!raw) return false;
+        const topic = Topic.fromBinary(Buffer.from(raw, "base64"));
+        const entry = topic.data.find(e => e.key === "oauthTokenInfoSentinelKey");
+        return !!entry?.value?.value;
     } catch {
         return false;
     }
@@ -94,19 +165,14 @@ export interface AuthData {
  */
 function readLegacyAuthStatus(): { apiKey: string; email: string; name: string } {
     try {
-        const db = new Database(resolveStateDbPath(), { readonly: true });
-        try {
-            const row = db.prepare("SELECT value FROM ItemTable WHERE key='antigravityAuthStatus'").get() as { value: string } | undefined;
-            if (!row) return { apiKey: "", email: "", name: "" };
-            const parsed = JSON.parse(row.value);
-            return {
-                apiKey: parsed.apiKey || "",
-                email: parsed.email || "",
-                name: parsed.name || "",
-            };
-        } finally {
-            db.close();
-        }
+        const raw = queryStateDb(resolveStateDbPath(), "antigravityAuthStatus");
+        if (!raw) return { apiKey: "", email: "", name: "" };
+        const parsed = JSON.parse(raw);
+        return {
+            apiKey: parsed.apiKey || "",
+            email: parsed.email || "",
+            name: parsed.name || "",
+        };
     } catch {
         return { apiKey: "", email: "", name: "" };
     }
@@ -155,26 +221,21 @@ export function readAuthStatus(): { apiKey: string; email: string; name: string 
  */
 export function readUssOAuthData(): UssOAuthData {
     try {
-        const db = new Database(resolveStateDbPath(), { readonly: true });
-        try {
-            const row = db.prepare("SELECT value FROM ItemTable WHERE key='antigravityUnifiedStateSync.oauthToken'").get() as { value: string } | undefined;
-            if (!row) return { key: "oauthTokenInfoSentinelKey", value: "" };
+        const raw = queryStateDb(resolveStateDbPath(), "antigravityUnifiedStateSync.oauthToken");
+        if (!raw) return { key: "oauthTokenInfoSentinelKey", value: "" };
 
-            const topicBytes = Buffer.from(row.value, "base64");
-            const topic = Topic.fromBinary(topicBytes);
+        const topicBytes = Buffer.from(raw, "base64");
+        const topic = Topic.fromBinary(topicBytes);
 
-            // Select by key name — NOT data[0]. The entry order differs between
-            // profiles (e.g. the IDE profile lists authStateWithContextSentinelKey
-            // first), so indexing blindly grabs the wrong entry.
-            const entry = topic.data.find(e => e.key === "oauthTokenInfoSentinelKey");
-            if (entry) {
-                return { key: entry.key, value: entry.value?.value || "" };
-            }
-
-            return { key: "oauthTokenInfoSentinelKey", value: "" };
-        } finally {
-            db.close();
+        // Select by key name — NOT data[0]. The entry order differs between
+        // profiles (e.g. the IDE profile lists authStateWithContextSentinelKey
+        // first), so indexing blindly grabs the wrong entry.
+        const entry = topic.data.find(e => e.key === "oauthTokenInfoSentinelKey");
+        if (entry) {
+            return { key: entry.key, value: entry.value?.value || "" };
         }
+
+        return { key: "oauthTokenInfoSentinelKey", value: "" };
     } catch {
         return { key: "oauthTokenInfoSentinelKey", value: "" };
     }
@@ -188,3 +249,4 @@ export function readAuthData(): AuthData {
     const ussOAuth = readUssOAuthData();
     return { ...status, ussOAuth };
 }
+
