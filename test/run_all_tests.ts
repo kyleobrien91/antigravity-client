@@ -6,6 +6,7 @@ async function main() {
     const testFiles = [
         'unit/test_accounts_store.ts',
         'unit/test_route_translation.ts',
+        'unit/test_obfuscator.ts',
         'test_cascade_golden_path.ts',
         'test_openai_responses.ts',
         'test_acp_stdio.ts',
