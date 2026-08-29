@@ -24,20 +24,19 @@ export async function runExtract() {
         refresh_token: info.refreshToken,
         access_token: info.accessToken,
         expires_at: info.expiry ? Number(info.expiry.seconds) * 1000 : undefined,
-        extracted_at: new Date().toISOString()
+        extracted_at: new Date().toISOString(),
+        disabled: false
     };
 
     const existing = config.accounts.find(a => a.refresh_token === info.refreshToken);
     if (existing) {
         console.log(`ℹ️ Token already exists in accounts.json for ${existing.email}. Updating...`);
-        Object.assign(existing, newAccount);
+        Object.assign(existing, newAccount, { disabled: false });
+        config.active = existing.email;
     } else {
         config.accounts.push(newAccount);
-        console.log(`✅ Extracted new token into accounts.json as ${email}.`);
-    }
-
-    if (!config.active) {
         config.active = email;
+        console.log(`✅ Extracted new token into accounts.json as ${email}.`);
     }
 
     store.save(config);
