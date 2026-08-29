@@ -178,14 +178,85 @@ function readLegacyAuthStatus(): { apiKey: string; email: string; name: string }
     }
 }
 
+interface KeyringItem {
+    label?: string;
+    attributes?: {
+        service?: string;
+        username?: string;
+    };
+    secret?: string;
+}
+
+interface KeyringGeminiSecret {
+    token?: {
+        access_token?: string;
+        refresh_token?: string;
+        expiry?: string;
+    };
+    email?: string;
+    name?: string;
+    auth_method?: string;
+}
+
+/**
+ * Reads token from Linux Desktop App's keyring_store.json (GNOME Libsecret fallback file).
+ */
+export function readLinuxKeyringToken(): OAuthTokenInfo | null {
+    const candidateDirs = [
+        path.join(homedir(), ".config", "Antigravity"),
+        path.join(homedir(), ".config", "Antigravity IDE"),
+    ];
+
+    for (const dir of candidateDirs) {
+        const kp = path.join(dir, "keyring_store.json");
+        if (!fs.existsSync(kp)) continue;
+        try {
+            const raw = fs.readFileSync(kp, "utf8");
+            const data: Record<string, KeyringItem> = JSON.parse(raw);
+            for (const item of Object.values(data)) {
+                if (item?.attributes?.service === "gemini" && typeof item.secret === "string") {
+                    let jsonStr = item.secret;
+                    // If secret is hex-encoded (standard in libsecret file backend)
+                    if (/^[0-9a-fA-F]+$/.test(item.secret)) {
+                        jsonStr = Buffer.from(item.secret, "hex").toString("utf8");
+                    }
+                    const parsed: KeyringGeminiSecret = JSON.parse(jsonStr);
+                    if (parsed.token?.refresh_token || parsed.token?.access_token) {
+                        const info = new OAuthTokenInfo();
+                        info.accessToken = parsed.token.access_token || "";
+                        info.refreshToken = parsed.token.refresh_token || "";
+                        if (parsed.token.expiry) {
+                            const expMs = Date.parse(parsed.token.expiry);
+                            if (!isNaN(expMs)) {
+                                info.expiry = { seconds: BigInt(Math.floor(expMs / 1000)) } as any;
+                            }
+                        }
+                        return info;
+                    }
+                }
+            }
+        } catch {
+            // Ignore parse errors and try next path
+        }
+    }
+    return null;
+}
+
 /**
  * Decode the stored `OAuthTokenInfo` (refresh token, access token, expiry, ...).
  *
  * Mirrors the real client's `OAuthPreferences.getOAuthTokenInfo()`: the durable
  * credential lives in the USS `oauthToken` topic under `oauthTokenInfoSentinelKey`,
- * present in BOTH standalone and IDE profiles. Returns null if not logged in.
+ * present in BOTH standalone and IDE profiles, or in Linux keyring_store.json.
  */
 export function getOAuthTokenInfo(): OAuthTokenInfo | null {
+    // 1. Check Linux desktop app keyring
+    const keyringInfo = readLinuxKeyringToken();
+    if (keyringInfo && keyringInfo.refreshToken) {
+        return keyringInfo;
+    }
+
+    // 2. Check USS database
     const uss = readUssOAuthData();
     if (!uss.value) return null;
     try {
@@ -216,29 +287,38 @@ export function readAuthStatus(): { apiKey: string; email: string; name: string 
 }
 
 /**
- * Read USS OAuth topic data from state.vscdb.
+ * Read USS OAuth topic data from state.vscdb or synthesized from keyring_store.json.
  * This is the data the LS expects to receive via SubscribeToUnifiedStateSyncTopic("uss-oauth").
  */
 export function readUssOAuthData(): UssOAuthData {
     try {
         const raw = queryStateDb(resolveStateDbPath(), "antigravityUnifiedStateSync.oauthToken");
-        if (!raw) return { key: "oauthTokenInfoSentinelKey", value: "" };
+        if (raw) {
+            const topicBytes = Buffer.from(raw, "base64");
+            const topic = Topic.fromBinary(topicBytes);
 
-        const topicBytes = Buffer.from(raw, "base64");
-        const topic = Topic.fromBinary(topicBytes);
-
-        // Select by key name — NOT data[0]. The entry order differs between
-        // profiles (e.g. the IDE profile lists authStateWithContextSentinelKey
-        // first), so indexing blindly grabs the wrong entry.
-        const entry = topic.data.find(e => e.key === "oauthTokenInfoSentinelKey");
-        if (entry) {
-            return { key: entry.key, value: entry.value?.value || "" };
+            // Select by key name — NOT data[0]. The entry order differs between
+            // profiles (e.g. the IDE profile lists authStateWithContextSentinelKey
+            // first), so indexing blindly grabs the wrong entry.
+            const entry = topic.data.find(e => e.key === "oauthTokenInfoSentinelKey");
+            if (entry && entry.value?.value) {
+                return { key: entry.key, value: entry.value.value };
+            }
         }
-
-        return { key: "oauthTokenInfoSentinelKey", value: "" };
     } catch {
-        return { key: "oauthTokenInfoSentinelKey", value: "" };
+        // Fallback to keyring
     }
+
+    // Fallback: Synthesize USS payload from Linux keyring if available
+    const keyringInfo = readLinuxKeyringToken();
+    if (keyringInfo) {
+        return {
+            key: "oauthTokenInfoSentinelKey",
+            value: Buffer.from(keyringInfo.toBinary()).toString("base64"),
+        };
+    }
+
+    return { key: "oauthTokenInfoSentinelKey", value: "" };
 }
 
 /**
