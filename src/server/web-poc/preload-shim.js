@@ -6,7 +6,7 @@
  * `window.electron*` globals injected by Electron's preload.js.
  *
  * This file recreates those globals with browser-native equivalents so the
- * UNMODIFIED 本家 UI can run in a plain browser. The reverse proxy injects
+ * UNMODIFIED original UI can run in a plain browser. The reverse proxy injects
  * this as the first <script> in <head>, so it runs before the app bundle.
  *
  * Source of truth: temp_app_asar/dist/preload.js

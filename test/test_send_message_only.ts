@@ -13,7 +13,7 @@ async function main() {
         const cascade = await client.startCascade();
         console.log(`✨ Cascade ID: ${cascade.cascadeId}`);
 
-        const msg = "こんにちは！これは送信のみのテストです。";
+        const msg = "Hello! This is a test of sending a message only.";
         console.log(`📨 Sending message: "${msg}"`);
         
         // cascade.run() internally waits until completion, but since we register

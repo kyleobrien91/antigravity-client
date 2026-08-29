@@ -37,11 +37,11 @@ export class CascadeEventParser {
     private lastEmittedThinking: Record<number, string> = {};
     private lastEmittedStdout: Record<number, string> = {};
     private lastEmittedStderr: Record<number, string> = {};
-    // ステップindex → 直近に emit した interaction の内容シグネチャ。
-    // 同じステップでも要求内容が変われば再 emit する必要があるため index だけでは不足。
-    // 例: パイプ付きコマンド "ls ... | grep ..." は LS が "ls" の許可 → 承認後に
-    //     "grep" の許可を「同じステップ index」で要求し直す。index だけの dedup だと
-    //     2回目を取りこぼし、ステップが永久に WAITING のまま固まる。
+    // Step index -> The signature of the interaction that was most recently emitted.
+    // Even for the same step, if the required content changes, it needs to be re-emitted, so checking just the index is not enough.
+    // Example: For a piped command "ls ... | grep ...", the LS requests permission for "ls" -> after approval,
+    //          it requests permission for "grep" again with the "same step index". If deduplicated by index alone,
+    //          the second request would be missed, and the step would permanently hang in WAITING.
     private emittedInteractions = new Map<number, string>();
     private lastStatus: CascadeRunStatus = CascadeRunStatus.UNSPECIFIED;
 
@@ -154,7 +154,7 @@ export class CascadeEventParser {
                 return;
             }
 
-            // 要求内容のシグネチャ。同一ステップでも内容が変われば(例: ls→grep)再 emit する。
+            // Signature of the requested content. If the content changes within the same step (e.g. ls -> grep), it re-emits.
             const reqValue: any = step.requestedInteraction?.interaction?.value;
             const reqResource = reqValue?.resource;
             const interactionSig = [

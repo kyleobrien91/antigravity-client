@@ -40,7 +40,7 @@ async function main() {
     }
 
     console.log("\n📨 Resuming conversation. Sending a follow-up...");
-    await cascade.sendMessage("今の内容を要約してください。");
+    await cascade.sendMessage("Please summarize the current content.");
 
     // Listen for new updates
     cascade.on(Cascade.Events.Text, (ev: TextDeltaEvent) => process.stdout.write(ev.delta));

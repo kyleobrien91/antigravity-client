@@ -8,7 +8,7 @@
 
 *Communicate directly with the Language Server binary via ConnectRPC. No IDE required.*
 
-[日本語版 README はこちら](README_ja.md)
+[Japanese README here](README_ja.md)
 
 </div>
 

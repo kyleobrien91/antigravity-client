@@ -39,7 +39,7 @@ async function main() {
         }
 
         // Use a prompt that triggers a command execution
-        const msg = process.argv[2] || "「ls -la」コマンドを実行して、結果を教えてください。";
+        const msg = process.argv[2] || "Execute the 'ls -la' command and let me know the result.";
         console.log(`Payload: "${msg}"`);
 
         // --- Event Listeners ---

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * web-poc/server.ts — Serve the 本家 Antigravity UI as a web app.
+ * web-poc/server.ts — Serve the original Antigravity UI as a web app.
  *
  * Architecture:
  *
@@ -267,7 +267,7 @@ async function main() {
 
   server.listen(PORT, () => {
     console.log("\n" + "=".repeat(60));
-    console.log(`  本家UI (web):  https://localhost:${PORT}/   (HTTP/2)`);
+    console.log(`  Original UI (web):  https://localhost:${PORT}/   (HTTP/2)`);
     console.log(`  Upstream LS:    ${upstreamOrigin}`);
     console.log("=".repeat(60) + "\n");
     console.log("Open the https:// URL above. Accept the self-signed cert warning once.");

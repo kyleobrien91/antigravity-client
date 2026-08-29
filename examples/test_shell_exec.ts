@@ -9,7 +9,7 @@ async function main() {
     const cascade = await client.startCascade();
     console.log(`🚀 Started cascade: ${cascade.cascadeId}`);
 
-    console.log("📨 Sending request: 'ls -a を実行してください'");
+    console.log("📨 Sending request: 'Please execute ls -a'");
 
     // Handle Text Deltas
     cascade.on(Cascade.Events.Text, (ev: TextDeltaEvent) => process.stdout.write(ev.delta));
@@ -60,7 +60,7 @@ async function main() {
     });
 
     // We can use cascade.run() to await the full sequence completion
-    await cascade.run("ls -a コマンドを実行して、その結果を教えてください。", { timeoutMs: 60000 });
+    await cascade.run("Please execute the ls -a command and let me know the result.", { timeoutMs: 60000 });
 
     console.log("\nSequence complete.");
     client.dispose();
