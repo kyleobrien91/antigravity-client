@@ -1,5 +1,6 @@
 import { AccountsStore } from './store.js';
 import { refreshAccessToken } from './oauth.js';
+import { getOAuthTokenInfo } from '../server/auth-reader.js';
 import type { Account } from './types.js';
 
 export class AccountRotator {
@@ -31,6 +32,22 @@ export class AccountRotator {
         // Check if token needs refresh (less than 5 minutes to expiry)
         const now = Date.now();
         if (!activeAccount.access_token || !activeAccount.expires_at || (activeAccount.expires_at - now) < 5 * 60 * 1000) {
+            // 1. First attempt to sync directly from local Antigravity LS / Desktop App state
+            try {
+                const localInfo = getOAuthTokenInfo();
+                if (localInfo && localInfo.accessToken && (!localInfo.refreshToken || localInfo.refreshToken === activeAccount.refresh_token)) {
+                    activeAccount.access_token = localInfo.accessToken;
+                    if (localInfo.expiry?.seconds) {
+                        activeAccount.expires_at = Number(localInfo.expiry.seconds) * 1000;
+                    }
+                    this.store.save(config);
+                    return activeAccount;
+                }
+            } catch {
+                // Fall through if local reader fails
+            }
+
+            // 2. Secondary fallback for offline/imported standalone accounts
             try {
                 activeAccount = await refreshAccessToken(activeAccount);
                 this.store.save(config); // Save the refreshed token
