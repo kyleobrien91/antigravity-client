@@ -141,3 +141,6 @@ vite.config.ts.timestamp-*
 temp_app_asar
 # web-poc self-signed certs
 src/server/web-poc/certs/
+
+# Aider
+.aider*
