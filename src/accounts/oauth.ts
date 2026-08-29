@@ -1,6 +1,10 @@
 function decodeCred(hex: string, key = 0x42): string {
-    const buf = Buffer.from(hex, 'hex');
-    return buf.map(b => b ^ key).toString('utf8');
+    const bytes = Buffer.from(hex, 'hex');
+    const decoded = Buffer.alloc(bytes.length);
+    for (let i = 0; i < bytes.length; i++) {
+        decoded[i] = bytes[i] ^ key;
+    }
+    return decoded.toString('utf8');
 }
 
 const DEFAULT_CLIENT_ID = decodeCred('73727573727274727472777b736f362f2a31312b2c702a70732e21302770717734362d2e2d282a762576727127326c233232316c252d2d252e2737312730212d2c36272c366c212d2f');

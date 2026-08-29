@@ -25,17 +25,67 @@ import { LanguageServerService } from "../gen/exa/language_server_pb/language_se
 import { SetUserSettingsRequest, AddTrackedWorkspaceRequest } from "../gen/exa/language_server_pb/language_server_pb.js";
 import { UserSettings, AgentBrowserTools, BrowserJsExecutionPolicy } from "../gen/exa/codeium_common_pb/codeium_common_pb.js";
 
-const DEFAULT_LS_BINARY = process.platform === "darwin"
-    ? path.join(
-        "/Applications/Antigravity.app/Contents/Resources/bin",
-        "language_server"
-      )
-    : process.platform === "win32"
-    ? path.join(
-        process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"),
-        "Programs", "Antigravity", "resources", "bin", "language_server.exe"
-      )
-    : "/opt/Antigravity/resources/bin/language_server";
+export function resolveDefaultLsBinary(): string {
+    if (process.env.AG_LS_BINARY && fs.existsSync(process.env.AG_LS_BINARY)) {
+        return process.env.AG_LS_BINARY;
+    }
+
+    const home = os.homedir();
+    const candidates: string[] = [];
+
+    if (process.platform === "darwin") {
+        candidates.push(
+            "/Applications/Antigravity.app/Contents/Resources/bin/language_server",
+            "/Applications/Antigravity IDE.app/Contents/Resources/bin/language_server",
+            path.join(home, "Applications/Antigravity.app/Contents/Resources/bin/language_server"),
+            path.join(home, ".local/bin/language_server"),
+        );
+    } else if (process.platform === "win32") {
+        const localAppData = process.env.LOCALAPPDATA || path.join(home, "AppData", "Local");
+        const programFiles = process.env.ProgramFiles || "C:\\Program Files";
+        candidates.push(
+            path.join(localAppData, "Programs", "Antigravity", "resources", "bin", "language_server.exe"),
+            path.join(localAppData, "Programs", "Antigravity IDE", "resources", "bin", "language_server.exe"),
+            path.join(programFiles, "Antigravity", "resources", "bin", "language_server.exe"),
+            path.join(programFiles, "Antigravity IDE", "resources", "bin", "language_server.exe"),
+        );
+    } else {
+        // Linux / WSL
+        candidates.push(
+            path.join(home, ".local", "bin", "language_server"),
+            path.join(home, "Antigravity-x64", "resources", "bin", "language_server"),
+            path.join(home, "Antigravity", "resources", "bin", "language_server"),
+            "/opt/Antigravity/resources/bin/language_server",
+            "/opt/Antigravity IDE/resources/bin/language_server",
+            "/usr/local/bin/language_server",
+            "/usr/bin/language_server",
+        );
+
+        // Check active /tmp AppImage mount points
+        try {
+            if (fs.existsSync("/tmp")) {
+                const tmpEntries = fs.readdirSync("/tmp");
+                for (const entry of tmpEntries) {
+                    if (entry.startsWith(".mount_antigr")) {
+                        candidates.push(path.join("/tmp", entry, "resources", "bin", "language_server"));
+                    }
+                }
+            }
+        } catch {
+            // Ignore permission/readdir errors
+        }
+    }
+
+    for (const c of candidates) {
+        if (fs.existsSync(c)) {
+            return c;
+        }
+    }
+
+    return candidates[0] || (process.platform === "win32" ? "language_server.exe" : "/opt/Antigravity/resources/bin/language_server");
+}
+
+export const DEFAULT_LS_BINARY = resolveDefaultLsBinary();
 
 // Crash Monitoring Constants
 const RESTART_WINDOW_MS = 60000;
