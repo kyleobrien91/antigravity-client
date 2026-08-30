@@ -184,7 +184,7 @@ export class Launcher extends EventEmitter {
         const workspaceId = options.workspaceId ?? `indie-${path.basename(workspacePath)}`;
         const csrfToken = options.csrfToken ?? generateCsrfToken();
         const lsBinaryPath = options.lsBinaryPath ?? DEFAULT_LS_BINARY;
-        const cloudCodeEndpoint = options.cloudCodeEndpoint ?? "https://daily-cloudcode-pa.googleapis.com";
+        const cloudCodeEndpoint = options.cloudCodeEndpoint ?? "https://cloudcode-pa.googleapis.com";
         const geminiDir = options.geminiDir ?? path.join(os.tmpdir(), `gemini_${workspaceId}`);
         const appDataDir = options.appDataDir ?? "antigravity_client";
         const verbose = options.verbose ?? false;
@@ -244,7 +244,7 @@ export class Launcher extends EventEmitter {
         // OAuth token it receives over USS regardless).
         const metadataBin = createMetadataBinary({ apiKey: this.mockServer.apiKey });
         
-        // Advanced Injection Flags aligned with temp_app_asar
+        // Advanced Injection Flags aligned with real extension
         const lsArgs = [
             "--extension_server_port", String(this.mockServer.port),
             "--workspace_id", this.options.workspaceId,
@@ -252,14 +252,16 @@ export class Launcher extends EventEmitter {
             "--app_data_dir", this.options.appDataDir,
             "--enable_lsp",
             "--enable_sidecars",
-            "--subclient_type", "hub",
+            "--subclient_type", "ide",
             "--override_ide_name", "antigravity",
             "--csrf_token", this.options.csrfToken,
             "--http_server_port", "0",
             "--https_server_port", "0",
             "--lsp_port", "0",
-            "--cloud_code_endpoint", this.options.cloudCodeEndpoint,
         ];
+        if (this.options.cloudCodeEndpoint) {
+            lsArgs.push("--cloud_code_endpoint", this.options.cloudCodeEndpoint);
+        }
 
         if (this.options.verbose) console.log(`[Launcher] Spawning: ${this.options.lsBinaryPath} ${lsArgs.join(" ")}`);
 

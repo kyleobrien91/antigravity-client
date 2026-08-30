@@ -50,7 +50,7 @@ import { spawn } from "child_process";
 import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
-import { readAuthData, type AuthData } from "./auth-reader.js";
+import { readAuthData, readUssTopic, type AuthData } from "./auth-reader.js";
 import { launchDevToolsMcp } from "./launcher_mcp.js";
 
 export interface MockServerOptions {
@@ -100,6 +100,26 @@ export class MockExtensionServer extends EventEmitter {
         const topic = new Topic({
             data: [
                 new Topic_DataEntry({
+                    key: "authStateWithContextSentinelKey",
+                    value: new Row({
+                        value: JSON.stringify({
+                            state: "signedIn",
+                            context: {
+                                project: "",
+                                showProjectError: false,
+                                errorMessage: "",
+                                ineligibleMessage: "",
+                                verificationUrl: "",
+                                isGcpTos: false,
+                                browserOpenFailed: false,
+                                appealUrl: "",
+                                appealLinkText: ""
+                            }
+                        }),
+                        eTag: BigInt(Date.now()),
+                    })
+                }),
+                new Topic_DataEntry({
                     key: newAuthData.ussOAuth.key,
                     value: new Row({
                         value: newAuthData.ussOAuth.value,
@@ -135,26 +155,57 @@ export class MockExtensionServer extends EventEmitter {
                 },
 
                 async *subscribeToUnifiedStateSyncTopic(req, context) {
-                    if (req.topic === "uss-oauth") {
-                        const topic = new Topic({
-                            data: [
-                                new Topic_DataEntry({
-                                    key: authData.ussOAuth.key,
-                                    value: new Row({
-                                        value: authData.ussOAuth.value,
-                                        eTag: BigInt(1),
-                                    }),
-                                }),
-                            ],
-                        });
-                        yield new UnifiedStateSyncUpdate({
-                            updateType: { case: "initialState", value: topic },
-                        });
-                    } else {
-                        yield new UnifiedStateSyncUpdate({
-                            updateType: { case: "initialState", value: new Topic({ data: [] }) },
-                        });
+                    if (self.verbose) {
+                        console.log(`[MockExtSrv] SubscribeToUnifiedStateSyncTopic requested topic: ${req.topic}`);
                     }
+
+                    // 1. Try reading real topic data from state.vscdb
+                    let topic = readUssTopic(req.topic);
+
+                    // 2. If it is uss-oauth / uss-oauthToken or we need to ensure current credentials
+                    if (req.topic === "uss-oauth" || req.topic === "uss-oauthToken" || !topic) {
+                        if (req.topic === "uss-oauth" || req.topic === "uss-oauthToken") {
+                            if (!topic) {
+                                topic = new Topic({
+                                    data: [
+                                        new Topic_DataEntry({
+                                            key: "authStateWithContextSentinelKey",
+                                            value: new Row({
+                                                value: JSON.stringify({
+                                                    state: "signedIn",
+                                                    context: {
+                                                        project: "",
+                                                        showProjectError: false,
+                                                        errorMessage: "",
+                                                        ineligibleMessage: "",
+                                                        verificationUrl: "",
+                                                        isGcpTos: false,
+                                                        browserOpenFailed: false,
+                                                        appealUrl: "",
+                                                        appealLinkText: ""
+                                                    }
+                                                }),
+                                                eTag: BigInt(1),
+                                            })
+                                        }),
+                                        new Topic_DataEntry({
+                                            key: authData.ussOAuth.key,
+                                            value: new Row({
+                                                value: authData.ussOAuth.value,
+                                                eTag: BigInt(1),
+                                            }),
+                                        }),
+                                    ],
+                                });
+                            }
+                        } else if (!topic) {
+                            topic = new Topic({ data: [] });
+                        }
+                    }
+
+                    yield new UnifiedStateSyncUpdate({
+                        updateType: { case: "initialState", value: topic },
+                    });
 
                     // Keep stream alive and wait for dynamic updates
                     while (!context.signal.aborted) {

@@ -322,6 +322,30 @@ export function readUssOAuthData(): UssOAuthData {
 }
 
 /**
+ * Read any arbitrary USS topic from state.vscdb by topic identifier.
+ * E.g. "uss-userStatus", "uss-oauthToken", "uss-agentPreferences", "uss-modelPreferences"
+ */
+export function readUssTopic(topicName: string): Topic | null {
+    const dbPath = resolveStateDbPath();
+    if (!dbPath || !fs.existsSync(dbPath)) return null;
+
+    let subKey = topicName.startsWith("uss-") ? topicName.substring(4) : topicName;
+    if (subKey === "oauth") subKey = "oauthToken";
+
+    const dbKey = `antigravityUnifiedStateSync.${subKey}`;
+    const raw = queryStateDb(dbPath, dbKey);
+    if (!raw) return null;
+
+    try {
+        return Topic.fromBinary(Buffer.from(raw, "base64"));
+    } catch {
+        return null;
+    }
+}
+
+export { resolveStateDbPath, queryStateDb };
+
+/**
  * Read all auth data needed for independent LS operation.
  */
 export function readAuthData(): AuthData {
