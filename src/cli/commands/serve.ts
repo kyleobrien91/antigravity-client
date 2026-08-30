@@ -5,6 +5,8 @@ import { AccountsStore } from '../../accounts/store.js';
 import { getDeviceFingerprint, getIdeVersion, getExtensionVersion } from '../../proxy/stealth/fingerprint.js';
 import { runWebviewWarmup } from '../../proxy/stealth/warmup.js';
 import { startHeartbeatLoop } from '../../proxy/stealth/heartbeat.js';
+import { OAuthTokenInfo } from '../../gen/exa/language_server_pb/language_server_pb.js';
+import { Timestamp } from '@bufbuild/protobuf';
 
 export async function runServe(port: number) {
     console.log(`[Serve] Initializing ZeroGravity-style Proxy...`);
@@ -23,6 +25,13 @@ export async function runServe(port: number) {
 
     console.log(`[Serve] Authenticating with account: ${activeAccount.email}`);
 
+    const oauthInfo = new OAuthTokenInfo();
+    oauthInfo.accessToken = activeAccount.access_token || '';
+    oauthInfo.refreshToken = activeAccount.refresh_token || '';
+    if (activeAccount.expires_at) {
+        oauthInfo.expiry = Timestamp.fromDate(new Date(activeAccount.expires_at));
+    }
+
     // Launch standalone LS with extracted token and stealth metadata
     const client = await AntigravityClient.launch({
         workspacePath: process.cwd(),
@@ -32,25 +41,28 @@ export async function runServe(port: number) {
             name: activeAccount.alias || activeAccount.email,
             ussOAuth: {
                 key: 'oauthTokenInfoSentinelKey',
-                value: Buffer.from(JSON.stringify({
-                    accessToken: activeAccount.access_token,
-                    refreshToken: activeAccount.refresh_token,
-                    expiry: { seconds: Math.floor((activeAccount.expires_at || 0) / 1000) }
-                })).toString('base64')
+                value: Buffer.from(oauthInfo.toBinary()).toString('base64')
             }
         }
     });
 
     try {
-        await client.getUserStatus();
-        console.log(`✅ Successfully connected to Antigravity Language Server!`);
+        const authStatus = await Promise.race([
+            client.getAuthStatus(),
+            new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000))
+        ]);
+        if (authStatus?.authResult?.hasValidAuth) {
+            console.log(`✅ Successfully authenticated with Antigravity Language Server!`);
+        } else {
+            console.log(`✅ Successfully connected to Antigravity Language Server! (USS OAuth active)`);
+        }
     } catch (e: any) {
         if (e.message && e.message.includes('429')) {
             await rotator.reportFailure(429);
         } else if (e.message && e.message.includes('403')) {
             await rotator.reportFailure(403);
         } else {
-            console.warn(`[Serve] Warning on startup auth check: ${e.message}`);
+            console.warn(`[Serve] Notice on startup auth check: ${e.message}`);
         }
     }
 

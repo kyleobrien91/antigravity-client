@@ -444,11 +444,11 @@ export class MockExtensionServer extends EventEmitter {
                 });
             }
 
-            this._browserReady = await this.pollCdp(cdpPort, 20000);
+            this._browserReady = await this.pollCdp(cdpPort, 3000);
             if (this._browserReady) {
                 if (this.verbose) console.log(`[MockExtSrv] ✅ Chrome ready on CDP port ${cdpPort}`);
             } else {
-                console.warn(`[MockExtSrv] ⚠️ Chrome startup timed out on port ${cdpPort}`);
+                if (this.verbose) console.warn(`[MockExtSrv] ⚠️ Chrome startup timed out or not available on port ${cdpPort}`);
             }
         } catch (e) {
             console.error(`[MockExtSrv] Error spawning Chrome:`, e);

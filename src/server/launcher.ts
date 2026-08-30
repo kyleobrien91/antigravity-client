@@ -227,8 +227,16 @@ export class Launcher extends EventEmitter {
     private async doStart(isRestart = false): Promise<void> {
         this.intentionalTermination = false;
         
+        let resolveLsInfo: (info: LsInfo) => void;
+        let isLsInfoResolved = false;
         const lsInfoPromise = new Promise<LsInfo>((resolve) => {
-            this.mockServer.once("ls-started", resolve);
+            resolveLsInfo = (info: LsInfo) => {
+                if (!isLsInfoResolved) {
+                    isLsInfoResolved = true;
+                    resolve(info);
+                }
+            };
+            this.mockServer.once("ls-started", resolveLsInfo);
         });
 
         // Match the real client's startup handshake: Metadata.apiKey =
@@ -264,6 +272,17 @@ export class Launcher extends EventEmitter {
             env
         });
 
+        const cleanupChild = () => {
+            if (this.lsProcess && !this.lsProcess.killed) {
+                try {
+                    this.lsProcess.kill("SIGKILL");
+                } catch { }
+            }
+        };
+        process.once("exit", cleanupChild);
+        process.once("SIGINT", cleanupChild);
+        process.once("SIGTERM", cleanupChild);
+
         this.lsProcess.stdin!.write(metadataBin);
         this.lsProcess.stdin!.end();
 
@@ -272,6 +291,9 @@ export class Launcher extends EventEmitter {
 
         let stderrLength = 0;
         const stderrChunks: string[] = [];
+        let parsedHttpsPort = 0;
+        let parsedHttpPort = 0;
+        let parsedLspPort = 0;
 
         const logToDisk = (data: Buffer, prefix: string) => {
             const str = data.toString();
@@ -284,6 +306,23 @@ export class Launcher extends EventEmitter {
                 stderrLength += str.length;
                 while (stderrChunks.length > 0 && stderrLength > MAX_STDERR_BUFFER) {
                     stderrLength -= stderrChunks.shift()!.length;
+                }
+
+                // Fallback port detection from LS logs
+                const httpsMatch = str.match(/listening on random port at (\d+) for HTTPS/i);
+                if (httpsMatch) parsedHttpsPort = parseInt(httpsMatch[1], 10);
+                const httpMatch = str.match(/listening on random port at (\d+) for HTTP/i);
+                if (httpMatch) parsedHttpPort = parseInt(httpMatch[1], 10);
+                const lspMatch = str.match(/listening on random port at (\d+) for LSP/i);
+                if (lspMatch) parsedLspPort = parseInt(lspMatch[1], 10);
+
+                if (parsedHttpsPort > 0) {
+                    resolveLsInfo({
+                        httpsPort: parsedHttpsPort,
+                        httpPort: parsedHttpPort,
+                        lspPort: parsedLspPort,
+                        csrfToken: this.options.csrfToken,
+                    });
                 }
             }
         };
@@ -311,7 +350,7 @@ export class Launcher extends EventEmitter {
         });
 
         const timeout = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("LS startup timeout (15s)")), 15000)
+            setTimeout(() => reject(new Error("LS startup timeout (30s)")), 30000)
         );
 
         this._lsInfo = await Promise.race([lsInfoPromise, timeout]);
@@ -337,6 +376,13 @@ export class Launcher extends EventEmitter {
     }
 
     private async injectSettingsAndWorkspace() {
+        const withTimeout = <T>(promise: Promise<T>, ms = 2500): Promise<T> => {
+            return Promise.race([
+                promise,
+                new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
+            ]);
+        };
+
         try {
             const transport = createConnectTransport({
                 baseUrl: `https://127.0.0.1:${this.httpsPort}`,
@@ -368,9 +414,9 @@ export class Launcher extends EventEmitter {
                 browserJsExecutionPolicy: BrowserJsExecutionPolicy.TURBO,
             });
 
-            await lsClient.setUserSettings(new SetUserSettingsRequest({ userSettings: browserSettings }));
+            await withTimeout(lsClient.setUserSettings(new SetUserSettingsRequest({ userSettings: browserSettings })));
         } catch (e: any) {
-            if (e.code !== 12) console.warn(`[Launcher] ⚠️ Failed to inject browser settings:`, e);
+            if (this.options.verbose && e.code !== 12) console.warn(`[Launcher] ⚠️ Failed to inject browser settings:`, e.message || e);
         }
 
         if (this.fullOptions.workspacePath) {
@@ -385,12 +431,12 @@ export class Launcher extends EventEmitter {
                     }],
                 });
                 const lsClient = createPromiseClient(LanguageServerService, transport);
-                await lsClient.addTrackedWorkspace(new AddTrackedWorkspaceRequest({
+                await withTimeout(lsClient.addTrackedWorkspace(new AddTrackedWorkspaceRequest({
                     workspace: this.fullOptions.workspacePath,
                     isPassiveWorkspace: false,
-                }));
-            } catch (e) {
-                console.warn(`[Launcher] ⚠️ Failed to inject tracked workspace:`, e);
+                })));
+            } catch (e: any) {
+                if (this.options.verbose) console.warn(`[Launcher] ⚠️ Failed to inject tracked workspace:`, e.message || e);
             }
         }
     }

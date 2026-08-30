@@ -14,11 +14,41 @@ export async function handleOpenAIRequest(
 ) {
     if (path === '/v1/models') {
         const models = await client.getAvailableModels();
-        const aliases = loadAliases();
-        const data = Object.keys(models).map(id => ({ id, object: 'model' }));
-        for (const alias of Object.keys(aliases)) {
-            data.push({ id: alias, object: 'model' });
+        const seen = new Set<string>();
+        const data: any[] = [];
+
+        for (const info of Object.values(models)) {
+            if (seen.has(info.label)) continue;
+            seen.add(info.label);
+
+            data.push({
+                id: info.label,
+                object: 'model',
+                created: 1700000000,
+                owned_by: info.provider?.toLowerCase() || 'google',
+                permission: [],
+                root: info.label,
+                parent: null,
+                is_premium: !!info.isPremium,
+                is_recommended: !!info.isRecommended,
+                disabled: !!info.disabled,
+                supports_images: !!info.supportsImages,
+                supports_thinking: !!info.supportsThinking,
+                thinking_budget: info.thinkingBudget,
+                max_tokens: info.maxTokens,
+                max_output_tokens: info.maxOutputTokens,
+                quota_tier: info.quotaTier || undefined,
+                tag_title: info.tagTitle || undefined,
+                tag_description: info.tagDescription || undefined,
+                description: info.description || '',
+                credit_multiplier: info.creditMultiplier ?? 1,
+                model_enum: info.model,
+                model_id: info.modelId,
+                model_id_key: info.modelIdKey,
+                alias: info.alias,
+            });
         }
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ object: 'list', data }));
         return;

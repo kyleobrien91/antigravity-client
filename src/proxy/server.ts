@@ -67,6 +67,10 @@ export function startProxyServer(options: ProxyServerOptions) {
         }
     });
 
+    server.on('error', (err: any) => {
+        console.error(`[Proxy] Server error:`, err.message || err);
+    });
+
     server.listen(options.port, () => {
         console.log(`[Proxy] ZeroGravity API proxy running on http://localhost:${options.port}`);
         console.log(`[Proxy] OpenAI-compatible endpoint: http://localhost:${options.port}/v1`);
