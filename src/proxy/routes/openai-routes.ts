@@ -98,7 +98,7 @@ export async function handleOpenAIRequest(
         req.on('aborted', cancelCascade);
 
         const lastMessage = messages[messages.length - 1]?.content || '';
-        while(cascade.state.status === 0 /* UNSPECIFIED */) { await new Promise(r => setTimeout(r, 50)); }
+        while(cascade.state && cascade.state.status === 0 /* UNSPECIFIED */) { await new Promise(r => setTimeout(r, 50)); }
         const reqPromise = cascade.sendMessage(lastMessage, { model });
 
         try {
@@ -200,7 +200,7 @@ export async function handleOpenAIRequest(
         req.on('aborted', cancelCascade);
 
         const lastMessage = messages[messages.length - 1]?.content || '';
-        while(cascade.state.status === 0 /* UNSPECIFIED */) { await new Promise(r => setTimeout(r, 50)); }
+        while(cascade.state && cascade.state.status === 0 /* UNSPECIFIED */) { await new Promise(r => setTimeout(r, 50)); }
         const reqPromise = cascade.sendMessage(lastMessage, { model });
 
         try {
