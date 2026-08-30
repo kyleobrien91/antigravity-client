@@ -215,10 +215,10 @@ export class Cascade extends EventEmitter {
     waitForTurnComplete(opts: { timeoutMs?: number } = {}): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             let timer: ReturnType<typeof setTimeout> | undefined;
-            let hasLeftIdle = this.state.status !== CascadeRunStatus.IDLE;
+            let hasLeftIdle = this.state.status === CascadeRunStatus.RUNNING;
 
             const handler = (ev: { status: RunStatus; previousStatus: RunStatus }) => {
-                if (ev.status !== "idle") {
+                if (ev.status === "running") {
                     hasLeftIdle = true;
                 }
                 if (hasLeftIdle && ev.status === "idle") {
